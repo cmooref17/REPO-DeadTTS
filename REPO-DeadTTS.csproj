@@ -67,8 +67,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ConfigSettings.cs" />
-    <Compile Include="TTSUIPatcher.cs" />
-    <Compile Include="PlayerPatcher.cs" />
+    <Compile Include="Patches\UIPatcher.cs" />
+    <Compile Include="Patches\PlayerPatcher.cs" />
     <Compile Include="Plugin.cs" />
     <Compile Include="PluginInfo.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 
-namespace REPO_DeadTTS
+namespace REPO_DeadTTS.Patches
 {
     [HarmonyPatch]
     public static class PlayerPatcher
