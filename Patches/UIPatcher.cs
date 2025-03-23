@@ -16,6 +16,7 @@ namespace REPO_DeadTTS.Patches
     public static class UIPatcher
     {
         private static HashSet<WorldSpaceUITTS> deadTTSElements = new HashSet<WorldSpaceUITTS>();
+        private static Dictionary<PlayerAvatar, bool> isDisabledStates = new Dictionary<PlayerAvatar, bool>();
 
         private static FieldInfo textField = typeof(WorldSpaceUITTS).GetField("text", BindingFlags.NonPublic | BindingFlags.Instance);
         private static FieldInfo playerAvatarField = typeof(WorldSpaceUITTS).GetField("playerAvatar", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -25,7 +26,7 @@ namespace REPO_DeadTTS.Patches
         private static FieldInfo wordTimeField = typeof(WorldSpaceUITTS).GetField("wordTime", BindingFlags.NonPublic | BindingFlags.Instance);
         private static FieldInfo voiceChatField = typeof(PlayerAvatar).GetField("voiceChat", BindingFlags.NonPublic | BindingFlags.Instance);
         private static FieldInfo ttsVoiceField = typeof(WorldSpaceUITTS).GetField("ttsVoice", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static FieldInfo isSpeakingField = typeof(TTSVoice).GetField("isSpeaking", BindingFlags.NonPublic | BindingFlags.Instance);
+        
 
         [HarmonyPatch(typeof(WorldSpaceUIParent), "TTS")]
         [HarmonyPrefix]
@@ -54,6 +55,10 @@ namespace REPO_DeadTTS.Patches
                     ttsVoiceField.SetValue(component, voiceChat.ttsVoice);
 
                     deadTTSElements.Add(component);
+
+                    // Clean up old elements in the hashset
+                    try { deadTTSElements.RemoveWhere(obj => obj == null); }
+                    catch { }
                 }
                 catch (Exception e)
                 {
@@ -67,21 +72,39 @@ namespace REPO_DeadTTS.Patches
         [HarmonyPrefix]
         private static void OnUpdatePrefix(WorldSpaceUITTS __instance)
         {
-            if (ConfigSettings.deadTTSSpatialAudio.Value && deadTTSElements.Contains(__instance))
+            if (ConfigSettings.displayDeadTTSText.Value && deadTTSElements.Contains(__instance))
             {
                 try
                 {
-                    var ttsVoice = (TTSVoice)ttsVoiceField.GetValue(__instance);
-                    bool isSpeaking = (bool)isSpeakingField.GetValue(ttsVoice);
-                    if (isSpeaking)
-                    {
-                        FieldInfo textAlphaField = typeof(WorldSpaceUITTS).GetField("textAlpha", BindingFlags.NonPublic | BindingFlags.Instance);
-                        textAlphaField.SetValue(__instance, 10.0f);
-                    }
+                    var playerAvatar = (PlayerAvatar)playerAvatarField.GetValue(__instance);
+                    bool isDisabled = (bool)PlayerPatcher.isDisabledField.GetValue(playerAvatar);
+                    isDisabledStates[playerAvatar] = isDisabled;
+                    PlayerPatcher.isDisabledField.SetValue(playerAvatar, false);
                 }
                 catch (Exception e)
                 {
-                    Plugin.LogError("Error updating dead TTS UI location:\n" + e);
+                    Plugin.LogError("Error (A) updating dead TTS UI location:\n" + e);
+                    deadTTSElements.Remove(__instance);
+                }
+            }
+        }
+
+
+        [HarmonyPatch(typeof(WorldSpaceUITTS), "Update")]
+        [HarmonyPostfix]
+        private static void OnUpdatePostfix(WorldSpaceUITTS __instance)
+        {
+            if (deadTTSElements.Contains(__instance))
+            {
+                try
+                {
+                    var playerAvatar = (PlayerAvatar)playerAvatarField.GetValue(__instance);
+                    if (isDisabledStates.TryGetValue(playerAvatar, out bool isDisabled))
+                        PlayerPatcher.isDisabledField.SetValue(playerAvatar, isDisabled);
+                }
+                catch (Exception e)
+                {
+                    Plugin.LogError("Error (B) updating dead TTS UI location:\n" + e);
                     deadTTSElements.Remove(__instance);
                 }
             }
