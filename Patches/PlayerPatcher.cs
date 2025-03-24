@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using Photon.Pun;
 using Photon.Realtime;
 using REPO_DeadTTS.Config;
 using System;
@@ -10,6 +11,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace REPO_DeadTTS.Patches
 {
@@ -18,21 +20,25 @@ namespace REPO_DeadTTS.Patches
     {
         internal static PlayerAvatar localPlayer;
         internal static FieldInfo isDisabledField = typeof(PlayerAvatar).GetField("isDisabled", BindingFlags.NonPublic | BindingFlags.Instance);
+        /*internal static FieldInfo eyeFlashLerpField = typeof(PlayerDeathHead).GetField("eyeFlashLerp", BindingFlags.NonPublic | BindingFlags.Instance);
+        internal static FieldInfo eyeFlashField = typeof(PlayerDeathHead).GetField("eyeFlash", BindingFlags.NonPublic | BindingFlags.Instance);
+        internal static FieldInfo isSpeakingField = typeof(TTSVoice).GetField("isSpeaking", BindingFlags.NonPublic | BindingFlags.Instance);*/
 
         private static Dictionary<PlayerAvatar, float> deadPlayersVoicePitch = new Dictionary<PlayerAvatar, float>();
 
+
         [HarmonyPatch(typeof(PlayerAvatar), "Awake")]
         [HarmonyPostfix]
-        public static void InitLocalPlayer(ref bool ___isLocal, PlayerAvatar __instance)
+        public static void InitPlayer(ref bool ___isLocal, PlayerAvatar __instance)
         {
             if (___isLocal)
                 localPlayer = __instance;
         }
 
 
-        [HarmonyPatch(typeof(RoundDirector), "StartRoundRPC")]
+        [HarmonyPatch(typeof(RoundDirector), "StartRoundLogic")]
         [HarmonyPrefix]
-        public static void RandomizePitch(int value, RoundDirector __instance)
+        public static void RandomizeTTSPitch(int value, RoundDirector __instance)
         {
             int seed = value;
             deadPlayersVoicePitch.Clear();
@@ -44,19 +50,23 @@ namespace REPO_DeadTTS.Patches
                     float randomPitch = 1;
                     if (value > 0)
                     {
-                        int playerId = 0;
+                        int playerId = -1;
+                        int playerSeed = -1;
                         try { playerId = player.photonView.Owner.ActorNumber; }
-                        catch (Exception e)
+                        catch (Exception e) { Plugin.LogWarning("Failed to get player id for player: " + player.name + " when calculating random seed. Don't worry about this.\n" + e); }
+                        if (playerId != -1)
                         {
-                            Plugin.LogWarning("Failed to get player id for player: " + player.name + " when calculating random seed. Don't worry about this.\n" + e);
-                        }
-                        seed += playerId;
-                        System.Random random = new System.Random(seed);
-                        float minValue = 0.1f; // Minimum value (hardcoded for now)
-                        float maxValue = 2.0f; // Maximum value (hardcoded for now)
+                            playerSeed = seed + playerId;
+                            System.Random random = new System.Random(playerSeed);
+                            float minValue = ConfigSettings.minRandomPitch.Value;
+                            float maxValue = ConfigSettings.maxRandomPitch.Value;
 
-                        // Generate a random float between minValue and maxValue
-                        randomPitch = (float)(random.NextDouble() * (maxValue - minValue) + minValue);
+                            // Generate a random float between minValue and maxValue
+                            randomPitch = (float)(random.NextDouble() * (maxValue - minValue) + minValue);
+                        }
+                        //Plugin.LogWarning("BaseSeed: " + seed + " PlayerId: " + playerId + " PlayerSeed: " + playerSeed);
+                        if (deadPlayersVoicePitch.TryGetValue(player, out float pitch) && randomPitch != pitch)
+                            Plugin.Log("Setting dead TTS pitch for player with id: " + playerId + " to: " + randomPitch);
                     }
                     deadPlayersVoicePitch[player] = randomPitch;
                 }
@@ -64,32 +74,9 @@ namespace REPO_DeadTTS.Patches
         }
 
 
-        /*[HarmonyPatch(typeof(PlayerAvatar), "PlayerDeathDone")]
-        [HarmonyPostfix]
-        private static void OnPlayerDeath(ref int ___steamIDshort, ref string ___steamID, PlayerAvatar __instance)
-        {
-            //deadPlayersVoicePitch[__instance] = -1;
-            int playerId;
-            
-            int gameSeed = 0;
-            var seedField = typeof(UnityEngine.Random).GetField("seed", BindingFlags.NonPublic | BindingFlags.Static);
-            gameSeed = (int)seedField.GetValue(null);
-
-            int seed = (GameDirector.instance ? GameDirector.instance.Seed : 0) + playerId;
-            System.Random random = new System.Random(seed);
-            float minValue = 0.1f; // Minimum value (hardcoded for now)
-            float maxValue = 2.0f; // Maximum value (hardcoded for now)
-
-            // Generate a random float between minValue and maxValue
-            float randomPitch = (float)(random.NextDouble() * (maxValue - minValue) + minValue);
-            deadPlayersVoicePitch[__instance] = randomPitch;
-            Plugin.LogWarning("Random Pitch: " + randomPitch + " GameSeed: " + (GameDirector.instance ? GameDirector.instance.Seed : 0) + " GameSeed2: " + gameSeed + " PlayerId: " + playerId);
-        }*/
-
-
         [HarmonyPatch(typeof(PlayerVoiceChat), "TtsFollowVoiceSettings")]
         [HarmonyPostfix]
-        private static void OnTtsFollowVoiceSettings(ref PlayerAvatar ___playerAvatar, ref AudioLowPassLogic ___lowPassLogicTTS, ref bool ___inLobbyMixerTTS, PlayerVoiceChat __instance)
+        public static void OnTtsFollowVoiceSettings(ref PlayerAvatar ___playerAvatar, ref AudioLowPassLogic ___lowPassLogicTTS, ref bool ___inLobbyMixerTTS, ref float ___clipLoudnessTTS, PlayerVoiceChat __instance)
         {
             if (!___playerAvatar || !___playerAvatar.playerDeathHead || !__instance.ttsAudioSource || !__instance.ttsVoice || !__instance.mixerTTSSound)
                 return;
@@ -106,21 +93,34 @@ namespace REPO_DeadTTS.Patches
                     __instance.ttsAudioSource.outputAudioMixerGroup = __instance.mixerTTSSound;
                     __instance.ttsVoice.StopAndClearVoice();
                 }
-                //__instance.ttsAudioSource.pitch = ConfigSettings.deadTTSPitch.Value;
+                
                 float pitch = deadPlayersVoicePitch.ContainsKey(___playerAvatar) ? deadPlayersVoicePitch[___playerAvatar] : 1;
                 __instance.ttsAudioSource.pitch = pitch;
-                __instance.ttsAudioSource.volume = ConfigSettings.deadTTSVolume.Value;
+                if (!(ConfigSettings.disableWhileDead.Value && (bool)isDisabledField.GetValue(localPlayer)))
+                {
+                    //__instance.ttsAudioSource.pitch = ConfigSettings.deadTTSPitch.Value;
+                    __instance.ttsAudioSource.volume = ConfigSettings.deadTTSVolume.Value;
 
-                // Force 3d spatial audio
-                if (ConfigSettings.deadTTSSpatialAudio.Value)
-                    __instance.ttsAudioSource.spatialBlend = 1;
+                    // Force 3d spatial audio
+                    if (ConfigSettings.deadTTSSpatialAudio.Value)
+                        __instance.ttsAudioSource.spatialBlend = 1;
+                }
+                else
+                {
+                    __instance.ttsAudioSource.volume = 1;
+                }
+
+                /*bool isSpeaking = (bool)isSpeakingField.GetValue(__instance.ttsVoice);
+                float eyeFlashLerp = isSpeaking ? Mathf.Clamp(Mathf.Max(___clipLoudnessTTS - 0.02f, 0) / 0.2f, 0, 1) : 0;
+                eyeFlashField.SetValue(___playerAvatar.playerDeathHead, true);
+                eyeFlashLerpField.SetValue(___playerAvatar.playerDeathHead, eyeFlashLerp);*/
             }
         }
 
 
         [HarmonyPatch(typeof(PlayerVoiceChat), "ToggleLobby")]
         [HarmonyPostfix]
-        private static void OnToggleOffLobbyChat(bool _toggle, ref PlayerAvatar ___playerAvatar, PlayerVoiceChat __instance)
+        public static void OnToggleOffLobbyChat(bool _toggle, ref PlayerAvatar ___playerAvatar, PlayerVoiceChat __instance)
         {
             if (!__instance.ttsAudioSource || !__instance.mixerTTSSound)
                 return;
@@ -138,7 +138,7 @@ namespace REPO_DeadTTS.Patches
 
         [HarmonyPatch(typeof(PlayerVoiceChat), "LateUpdate")]
         [HarmonyPrefix]
-        private static void MoveTTSAudioTransform(ref PlayerAvatar ___playerAvatar, ref bool ___inLobbyMixerTTS, PlayerVoiceChat __instance)
+        public static void MoveTTSAudioTransform(ref PlayerAvatar ___playerAvatar, ref bool ___inLobbyMixerTTS, PlayerVoiceChat __instance)
         {
             if (!LevelGenerator.Instance.Generated || !GameManager.Multiplayer() || GameDirector.instance.currentState < GameDirector.gameState.Main || !___playerAvatar)
                 return;
@@ -149,4 +149,43 @@ namespace REPO_DeadTTS.Patches
             }
         }
     }
+
+
+    /*public class DeadTTS : MonoBehaviour
+    {
+        public static Dictionary<PlayerAvatar, DeadTTS> avatarToDeadTTSMap = new Dictionary<PlayerAvatar, DeadTTS>();
+        public PlayerAvatar playerAvatar;
+        public float pitch = 1;
+
+        public void Awake()
+        {
+            playerAvatar = gameObject.GetComponent<PlayerAvatar>();
+            if (!playerAvatar)
+            {
+                enabled = false;
+                return;
+            }
+            avatarToDeadTTSMap[playerAvatar] = this;
+        }
+
+
+        public void OnDestroy()
+        {
+            if (playerAvatar && avatarToDeadTTSMap.ContainsKey(playerAvatar))
+                avatarToDeadTTSMap.Remove(playerAvatar);
+        }
+
+
+        [PunRPC]
+        public void SetTTSPitchRPC(float pitch)
+        {
+            SetTTSPitch(pitch);
+        }
+
+
+        public void SetTTSPitch(float pitch)
+        {
+            pitch = Mathf.Clamp(pitch, ConfigSettings.minRandomPitch.Value, ConfigSettings.maxRandomPitch.Value);
+        }
+    }*/
 }
