@@ -43,8 +43,11 @@ namespace REPO_DeadTTS
             catch { logger = Logger; }
         }
 
-        public static void Log(string message) => logger.LogInfo(message);
-        public static void LogError(string message) => logger.LogError(message);
-        public static void LogWarning(string message) => logger.LogWarning(message);
+        internal static void Log(string message) => logger.LogInfo(message);
+        internal static void LogError(string message) => logger.LogError(message);
+        internal static void LogWarning(string message) => logger.LogWarning(message);
+        internal static void LogVerbose(string message) { if (ConfigSettings.verboseLogs.Value) logger.LogInfo("[VERBOSE] " + message); }
+        internal static void LogErrorVerbose(string message) { if (ConfigSettings.verboseLogs.Value) logger.LogError("[VERBOSE] " + message); }
+        internal static void LogWarningVerbose(string message) { if (ConfigSettings.verboseLogs.Value) logger.LogWarning("[VERBOSE] " + message); }
     }
 }
