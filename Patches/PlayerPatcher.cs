@@ -27,6 +27,7 @@ namespace REPO_DeadTTS.Patches
         internal static FieldInfo eyeMaterialAmountField = typeof(PlayerDeathHead).GetField("eyeMaterialAmount", BindingFlags.NonPublic | BindingFlags.Instance);
         internal static FieldInfo eyeFlashLerpField = typeof(PlayerDeathHead).GetField("eyeFlashLerp", BindingFlags.NonPublic | BindingFlags.Instance);
         internal static FieldInfo isSpeakingField = typeof(TTSVoice).GetField("isSpeaking", BindingFlags.NonPublic | BindingFlags.Instance);
+        //internal static FieldInfo spawnedField = typeof(PlayerAvatar).GetField("spawned", BindingFlags.NonPublic | BindingFlags.Instance);
 
         //internal static HashSet<PlayerAvatar> deadPlayers = new HashSet<PlayerAvatar>();
         internal static Dictionary<PlayerAvatar, float> deadPlayersVoicePitch = new Dictionary<PlayerAvatar, float>();
@@ -87,81 +88,78 @@ namespace REPO_DeadTTS.Patches
         [HarmonyPostfix]
         public static void OnTtsFollowVoiceSettings(ref PlayerAvatar ___playerAvatar, ref AudioLowPassLogic ___lowPassLogicTTS, ref bool ___inLobbyMixerTTS, ref float ___clipLoudnessTTS, PlayerVoiceChat __instance)
         {
-            if (!___playerAvatar || !___playerAvatar.playerDeathHead)
+            if (!GameManager.Multiplayer() || GameDirector.instance.currentState != GameDirector.gameState.Main || !LevelGenerator.Instance.Generated || !(SemiFunc.RunIsLevel() || SemiFunc.RunIsTutorial() || SemiFunc.RunIsShop() || SemiFunc.RunIsArena()))
+                return;
+            if (!___playerAvatar)
                 return;
 
-            if (GameManager.Multiplayer() && GameDirector.instance.currentState >= GameDirector.gameState.Main)
+            // if player is dead
+            if (/*(bool)spawnedField.GetValue(___playerAvatar) && */IsPlayerDead(___playerAvatar) && ___inLobbyMixerTTS)
             {
-                // if player is dead
-                if (IsPlayerDead(___playerAvatar) && ___playerAvatar.playerDeathHead.isActiveAndEnabled && ___inLobbyMixerTTS)
+                if (!ConfigSettings.enableWhenDiscovered.Value || (!___playerAvatar.playerDeathHead || (bool)serverSeenField.GetValue(___playerAvatar.playerDeathHead)) || IsLocalPlayerDead() || !SemiFunc.RunIsLevel())
                 {
-                    if (!ConfigSettings.enableWhenDiscovered.Value || (bool)serverSeenField.GetValue(___playerAvatar.playerDeathHead) || IsLocalPlayerDead() || !SemiFunc.RunIsLevel())
+                    if (__instance.ttsAudioSource && __instance.mixerTTSSound)
                     {
-                        if (__instance.ttsAudioSource && __instance.ttsVoice && __instance.mixerTTSSound)
+                        if (__instance.ttsAudioSource.outputAudioMixerGroup != __instance.mixerTTSSound)
                         {
-                            if (__instance.ttsAudioSource.outputAudioMixerGroup != __instance.mixerTTSSound)
+                            __instance.ttsAudioSource.outputAudioMixerGroup = __instance.mixerTTSSound;
+
+                            if (!___playerAvatar.playerDeathHead)
                             {
-                                Plugin.LogVerbose("The game has toggled ON lobby chat for player: " + ___playerAvatar.name + ". Disabling TTS lobby mixer.");
-                                __instance.ttsVoice.setVoice(1);
-                                __instance.ttsAudioSource.outputAudioMixerGroup = __instance.mixerTTSSound;
-                                __instance.ttsVoice.StopAndClearVoice();
+                                Plugin.LogWarning("Game did not assign player a death head.");
                             }
-
-                            float pitch = deadPlayersVoicePitch.ContainsKey(___playerAvatar) ? deadPlayersVoicePitch[___playerAvatar] : 1;
-                            __instance.ttsAudioSource.pitch = pitch;
-                            if (!(ConfigSettings.disableWhileDead.Value && IsLocalPlayerDead()) && ___playerAvatar != localPlayer)
+                            if (!__instance.ttsVoice)
                             {
-                                //__instance.ttsAudioSource.pitch = ConfigSettings.deadTTSPitch.Value;
-                                __instance.ttsAudioSource.volume = ConfigSettings.deadTTSVolume.Value;
-
-                                // Force 3d spatial audio
-                                if (ConfigSettings.deadTTSSpatialAudio.Value)
-                                    __instance.ttsAudioSource.spatialBlend = 1;
+                                Plugin.LogWarning("Game did not assign player a tts voice.");
                             }
                             else
                             {
-                                __instance.ttsAudioSource.volume = 1;
+                                Plugin.LogVerbose("The game has toggled ON lobby chat for player: " + ___playerAvatar.name + ". Disabling TTS lobby mixer.");
+                                __instance.ttsVoice.setVoice(1);
+                                __instance.ttsVoice.StopAndClearVoice();
                             }
                         }
-                    }
 
-                    // flash eyes while talking
-                    if (___playerAvatar.playerDeathHead)
-                    {
-                        bool isSpeaking = (bool)isSpeakingField.GetValue(__instance.ttsVoice);
-                        Material eyeMaterial = (Material)eyeMaterialField.GetValue(___playerAvatar.playerDeathHead);
-                        int eyeMaterialAmount = (int)eyeMaterialAmountField.GetValue(___playerAvatar.playerDeathHead);
-                        if (isSpeaking)
+                        float pitch = deadPlayersVoicePitch.ContainsKey(___playerAvatar) ? deadPlayersVoicePitch[___playerAvatar] : 1;
+                        __instance.ttsAudioSource.pitch = pitch;
+                        if (!(ConfigSettings.disableWhileDead.Value && IsLocalPlayerDead()) && ___playerAvatar != localPlayer)
                         {
-                            float eyeFlashLerp = (float)eyeFlashLerpField.GetValue(___playerAvatar.playerDeathHead);
-                            float eyeFlashLerpTarget = Mathf.Clamp01(Mathf.Max(___clipLoudnessTTS, 0) / 0.2f);
-                            eyeFlashLerp = Mathf.Lerp(eyeFlashLerp, eyeFlashLerpTarget, 20f * Time.deltaTime);
-                            eyeMaterial.SetFloat(eyeMaterialAmount, Mathf.Pow(eyeFlashLerp, 0.5f));
-                            eyeFlashLerpField.SetValue(___playerAvatar.playerDeathHead, eyeFlashLerp);
+                            __instance.ttsAudioSource.volume = ConfigSettings.deadTTSVolume.Value;
+
+                            // Force 3d spatial audio
+                            if (ConfigSettings.deadTTSSpatialAudio.Value)
+                                __instance.ttsAudioSource.spatialBlend = 1;
+                        }
+                        else
+                        {
+                            __instance.ttsAudioSource.volume = 1;
                         }
                     }
-                    /*deadPlayers.Add(___playerAvatar);
-                    return;*/
-                }
-            }
-
-            /*if (deadPlayers.Contains(___playerAvatar))
-            {
-                deadPlayers.Remove(___playerAvatar);
-                if (__instance.ttsAudioSource && __instance.ttsVoice)
-                {
-                    __instance.ttsAudioSource.volume = 1.0f;
-                    __instance.ttsAudioSource.pitch = 1.0f;
-                    __instance.ttsVoice.setVoice(0);
+                    else
+                    {
+                        string error = (bool)__instance.ttsAudioSource ? "Game did not assign player a ttsAudioSource. " : "";
+                        error += (bool)__instance.mixerTTSSound ? "Game did not assign player a mixerTTSSound." : "";
+                        if (!string.IsNullOrEmpty(error))
+                            Plugin.LogErrorVerbose(error.TrimEnd(' '));
+                    }
                 }
 
+                // flash eyes while talking
                 if (___playerAvatar.playerDeathHead)
                 {
+                    bool isSpeaking = (bool)isSpeakingField.GetValue(__instance.ttsVoice);
                     Material eyeMaterial = (Material)eyeMaterialField.GetValue(___playerAvatar.playerDeathHead);
                     int eyeMaterialAmount = (int)eyeMaterialAmountField.GetValue(___playerAvatar.playerDeathHead);
-                    eyeMaterial.SetFloat(eyeMaterialAmount, 0);
+                    if (isSpeaking)
+                    {
+                        float eyeFlashLerp = (float)eyeFlashLerpField.GetValue(___playerAvatar.playerDeathHead);
+                        float eyeFlashLerpTarget = Mathf.Clamp01(Mathf.Max(___clipLoudnessTTS, 0) / 0.2f);
+                        eyeFlashLerp = Mathf.Lerp(eyeFlashLerp, eyeFlashLerpTarget, 20f * Time.deltaTime);
+                        eyeMaterial.SetFloat(eyeMaterialAmount, Mathf.Pow(eyeFlashLerp, 0.5f));
+                        eyeFlashLerpField.SetValue(___playerAvatar.playerDeathHead, eyeFlashLerp);
+                    }
                 }
-            }*/
+            }
         }
 
 
@@ -169,7 +167,7 @@ namespace REPO_DeadTTS.Patches
         [HarmonyPostfix]
         public static void OnToggleOffLobbyChat(bool _toggle, ref PlayerAvatar ___playerAvatar, PlayerVoiceChat __instance)
         {
-            if (!GameManager.Multiplayer() || GameDirector.instance.currentState < GameDirector.gameState.Main)
+            if (!GameManager.Multiplayer() || GameDirector.instance.currentState != GameDirector.gameState.Main || !(SemiFunc.RunIsLevel() || SemiFunc.RunIsTutorial() || SemiFunc.RunIsShop() || SemiFunc.RunIsArena()))
                 return;
 
             if (!_toggle)
@@ -199,12 +197,52 @@ namespace REPO_DeadTTS.Patches
         {
             if (!LevelGenerator.Instance.Generated || !___playerAvatar)
                 return;
-            if (!GameManager.Multiplayer() || GameDirector.instance.currentState < GameDirector.gameState.Main)
+            if (!GameManager.Multiplayer() || GameDirector.instance.currentState != GameDirector.gameState.Main || !(SemiFunc.RunIsLevel() || SemiFunc.RunIsTutorial() || SemiFunc.RunIsShop() || SemiFunc.RunIsArena()))
                 return;
 
             if (___inLobbyMixerTTS && IsPlayerDead(___playerAvatar) && ___playerAvatar.playerDeathHead && __instance.ttsVoice)
             {
                 __instance.transform.position = Vector3.Lerp(__instance.transform.position, ___playerAvatar.playerDeathHead.transform.position, 30f * Time.deltaTime);
+            }
+        }
+
+
+        [HarmonyPatch(typeof(PlayerAvatar), "PlayerDeathDone")]
+        [HarmonyPrefix]
+        public static void TryFixMissingPlayerDeathHead(ref bool ___isDisabled, ref string ___playerName, PlayerAvatar __instance)
+        {
+            if (___isDisabled || __instance.playerDeathHead || !ConfigSettings.fixMissingDeathHeads.Value)
+                return;
+
+            bool log = GameDirector.instance.currentState == GameDirector.gameState.Main && (SemiFunc.RunIsLevel() || SemiFunc.RunIsTutorial() || SemiFunc.RunIsShop() || SemiFunc.RunIsArena());
+            if (log)
+                Plugin.LogWarning("[PlayerDeathDone] Player: " + ___playerName + " was not assigned a player death head by the game. Attempting to find and re-assign new head.");
+
+            PlayerDeathHead assignPlayerDeathHead = null;
+            PlayerDeathHead[] playerDeathHeads = GameObject.FindObjectsOfType<PlayerDeathHead>();
+            for (int i = 0; i < playerDeathHeads.Length; i++)
+            {
+                var playerDeathHead = playerDeathHeads[i];
+                PlayerAvatar headOwner = playerDeathHead?.playerAvatar;
+                if (!headOwner || headOwner.playerDeathHead != playerDeathHead)
+                {
+                    assignPlayerDeathHead = playerDeathHead;
+                    break;
+                }
+            }
+
+            if (assignPlayerDeathHead)
+            {
+                PlayerAvatar headOwner = assignPlayerDeathHead?.playerAvatar;
+                if (log)
+                    Plugin.LogWarning("(" + (!headOwner ? "A" : "B") + ") Found unassigned player death head and assigned to dead player: " + ___playerName);
+                __instance.playerDeathHead = assignPlayerDeathHead;
+                assignPlayerDeathHead.playerAvatar = __instance;
+            }
+            else
+            {
+                if (log)
+                    Plugin.LogError("Could not find replacement player death head. Dead TTS may not work properly for player: " + ___playerName);
             }
         }
 
@@ -218,9 +256,7 @@ namespace REPO_DeadTTS.Patches
 
         public static bool IsPlayerDead(PlayerAvatar playerAvatar)
         {
-            if (!playerAvatar || !playerAvatar.playerDeathHead)
-                return false;
-            return (bool)isDisabledField.GetValue(playerAvatar) && playerAvatar.playerDeathHead.isActiveAndEnabled;
+            return playerAvatar && (bool)isDisabledField.GetValue(playerAvatar) && (!playerAvatar.playerDeathHead || playerAvatar.playerDeathHead.isActiveAndEnabled);
         }
     }
 }

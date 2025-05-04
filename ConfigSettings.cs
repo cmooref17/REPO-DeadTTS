@@ -17,6 +17,7 @@ namespace REPO_DeadTTS.Config
         public static ConfigEntry<bool> enableWhenDiscovered;
         public static ConfigEntry<bool> disableWhileDead;
         public static ConfigEntry<string> deadTTSColor;
+        public static ConfigEntry<bool> fixMissingDeathHeads;
         public static ConfigEntry<bool> verboseLogs;
         public static Dictionary<string, ConfigEntryBase> currentConfigEntries = new Dictionary<string, ConfigEntryBase>();
 
@@ -30,10 +31,11 @@ namespace REPO_DeadTTS.Config
             deadTTSVolume = AddConfigEntry(Plugin.instance.Config.Bind("General", "Dead TTS Volume", 0.5f, new ConfigDescription("Affects the TTS volume of all dead players.\nSet to 0 to mute the TTS of dead players. If muted, the TTS text will still appear.\nValues will be clamped between 0.0 and 1.0", new AcceptableValueRange<float>(0.0f, 1.0f))));
             displayDeadTTSText = AddConfigEntry(Plugin.instance.Config.Bind("General", "Display Dead TTS Text", true, "If true, TTS Text will appear from dead players' heads."));
             deadTTSSpatialAudio = AddConfigEntry(Plugin.instance.Config.Bind("General", "Use Spatial Audio", true, "If true, TTS audio from dead players should be 3D directional.\nIf false, the audio should appear as if it's in your head all the time."));
-            enableWhenDiscovered = AddConfigEntry(Plugin.instance.Config.Bind("General", "Enable When Discovered", false, "If true, you will only head DeadTTS from players once their head is \"discovered\"."));
-            disableWhileDead = AddConfigEntry(Plugin.instance.Config.Bind("General", "Disable Spatial TTS While Dead", false, "This will only disable the (directional) DeadTTS for other dead players while you (the local player) are dead. Pitch will remain synced, however."));
-            deadTTSColor = AddConfigEntry(Plugin.instance.Config.Bind("General", "Dead TTS Text Color Hex", "CC3333", new ConfigDescription("Hex color value for dead TTS text color. Hex string must be 6 characters long.")));
+            enableWhenDiscovered = AddConfigEntry(Plugin.instance.Config.Bind("General", "Enable When Discovered", false, "If true, you will only hear DeadTTS from players once their head is \"discovered\"."));
+            disableWhileDead = AddConfigEntry(Plugin.instance.Config.Bind("General", "Disable While Dead", false, "Dead TTS will be disabled while you are dead."));
+            deadTTSColor = AddConfigEntry(Plugin.instance.Config.Bind("General", "Dead TTS Text Color Hex", "CC3333", new ConfigDescription("Hex color value for dead TTS text color. Hex string must be 6 characters long. Leave this field blank to use the vanilla TTS color.")));
 
+            fixMissingDeathHeads = AddConfigEntry(Plugin.instance.Config.Bind("General", "Fix Missing Death Heads", true, new ConfigDescription("Fixes an uncommon bug where the game may not assign a player a death head.")));
             verboseLogs = AddConfigEntry(Plugin.instance.Config.Bind("General", "Verbose Logs", false, new ConfigDescription("Enables verbose logs. Useful for debugging.")));
 
             if (minRandomPitch.Value < 0.8f)
@@ -43,6 +45,7 @@ namespace REPO_DeadTTS.Config
             minRandomPitch.Value = Mathf.Clamp(minRandomPitch.Value, 0.8f, 2.0f);
             maxRandomPitch.Value = Mathf.Max(maxRandomPitch.Value, minRandomPitch.Value);
             deadTTSVolume.Value = Mathf.Clamp(deadTTSVolume.Value, 0.0f, 2.0f);
+            deadTTSColor.Value = deadTTSColor.Value.Trim(' ');
         }
 
 
