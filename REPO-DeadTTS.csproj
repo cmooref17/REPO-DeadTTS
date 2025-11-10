@@ -84,6 +84,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ConfigSettings.cs" />
+    <Compile Include="Patches\DeadTTSPlayerData.cs" />
+    <Content Include="Patches\PlayerAvatar_NEW.txt" />
+    <Content Include="Patches\PlayerVoiceChat_NEW.txt" />
     <Compile Include="Patches\UIPatcher.cs" />
     <Compile Include="Patches\PlayerPatcher.cs" />
     <Compile Include="Plugin.cs" />
@@ -97,6 +100,7 @@
   <PropertyGroup>
     <PostBuildEvent>if exist "%25APPDATA%25\r2modmanPlus-local\REPO\profiles\Flip\BepInEx\plugins\flipf17-DeadTTS\" (
     xcopy /Y "$(TargetDir)$(TargetName).dll" "%25APPDATA%25\r2modmanPlus-local\REPO\profiles\Flip\BepInEx\plugins\flipf17-DeadTTS\"
-)</PostBuildEvent>
+)
+xcopy /Y "$(TargetDir)$(TargetName).dll" "C:\Program Files (x86)\Steam\steamapps\common\REPO\BepInEx\plugins\flipf17-DeadTTS\"</PostBuildEvent>
   </PropertyGroup>
 </Project>

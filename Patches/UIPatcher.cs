@@ -32,10 +32,12 @@ namespace REPO_DeadTTS.Patches
         [HarmonyPrefix]
         public static void OnTTSUI(PlayerAvatar _player, string _text, float _time, WorldSpaceUIParent __instance)
         {
-            if (!GameManager.Multiplayer() || GameDirector.instance.currentState != GameDirector.gameState.Main || !(SemiFunc.RunIsLevel() || SemiFunc.RunIsTutorial() || SemiFunc.RunIsShop() || SemiFunc.RunIsArena()))
+            if (!_player || !GameManager.Multiplayer())
                 return;
-
-            if (ConfigSettings.deadTTSSpatialAudio.Value && _player && PlayerPatcher.IsPlayerDead(_player))
+            if (GameDirector.instance.currentState != GameDirector.gameState.Main || !(SemiFunc.RunIsLevel() || SemiFunc.RunIsShop() || SemiFunc.RunIsArena()))
+                return;
+            
+            if (PlayerPatcher.IsPlayerDead(_player) && ConfigSettings.useSpatialAudioDeadTTS.Value && ConfigSettings.displayDeadTTSText.Value)
             {
                 if (!_player.playerDeathHead)
                 {
@@ -47,7 +49,14 @@ namespace REPO_DeadTTS.Patches
                     Plugin.LogErrorVerbose("Failed to re-create TTS UI component. Passed text value was null or empty.");
                     return;
                 }
-                if (!ConfigSettings.enableWhenDiscovered.Value || (bool)PlayerPatcher.serverSeenField.GetValue(_player.playerDeathHead) || PlayerPatcher.IsLocalPlayerDead() || !SemiFunc.RunIsLevel())
+
+                // If allowed to talk by base game
+                if ((bool)PlayerPatcher.spectatedField.GetValue(_player.playerDeathHead))
+                {
+                    return;
+                }
+
+                if (!ConfigSettings.onlyEnableWhenDiscovered.Value || (bool)PlayerPatcher.serverSeenField.GetValue(_player.playerDeathHead) || PlayerPatcher.IsLocalPlayerDead() || !SemiFunc.RunIsLevel())
                 {
                     try
                     {
@@ -108,7 +117,7 @@ namespace REPO_DeadTTS.Patches
                 }
                 else
                 {
-                    try { Plugin.LogWarningVerbose("Not creating TTS UI Element for dead player. ConfigEnableWhenDiscovered: " + ConfigSettings.enableWhenDiscovered.Value.ToString() + " | PlayerDiscovered: " + (ConfigSettings.enableWhenDiscovered.Value ? ((bool)PlayerPatcher.serverSeenField.GetValue(_player.playerDeathHead)).ToString() : "N/A") + " | IsLocalPlayerDead: " + PlayerPatcher.IsLocalPlayerDead().ToString() + " | RunIsLevel: " + SemiFunc.RunIsLevel().ToString()); }
+                    try { Plugin.LogWarningVerbose("Not creating TTS UI Element for dead player. ConfigEnableWhenDiscovered: " + ConfigSettings.onlyEnableWhenDiscovered.Value.ToString() + " | PlayerDiscovered: " + (ConfigSettings.onlyEnableWhenDiscovered.Value ? ((bool)PlayerPatcher.serverSeenField.GetValue(_player.playerDeathHead)).ToString() : "N/A") + " | IsLocalPlayerDead: " + PlayerPatcher.IsLocalPlayerDead().ToString() + " | RunIsLevel: " + SemiFunc.RunIsLevel().ToString()); }
                     catch(Exception e) { Plugin.LogErrorVerbose("Error logging state for OnTTSUI: " + e); }
                 }
             }
