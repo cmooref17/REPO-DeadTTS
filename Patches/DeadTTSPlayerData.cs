@@ -20,7 +20,6 @@ namespace REPO_DeadTTS.Patches
     [HarmonyPatch]
     public class DeadTTSPlayerData : MonoBehaviour
     {
-        internal static PlayerAvatar localPlayer;
         internal static FieldInfo playerNameField = typeof(PlayerAvatar).GetField("playerName", BindingFlags.NonPublic | BindingFlags.Instance);
         internal static FieldInfo steamIdField = typeof(PlayerAvatar).GetField("steamId", BindingFlags.NonPublic | BindingFlags.Instance);
         internal static MethodInfo setupClient = typeof(PlayerDeathHead).GetMethod("SetupClient", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -142,9 +141,9 @@ namespace REPO_DeadTTS.Patches
         {
             playerDeathHead = deathHead;
             int deathHeadViewId = playerDeathHead.GetComponent<PhotonView>().ViewID;
-            if (playerAvatar.playerDeathHead != playerDeathHead || playerDeathHead.playerAvatar != playerAvatar || playerDeathHead.transform.parent != playerAvatar.transform.parent)
+            if (playerAvatar.GetPlayerDeathHead() != playerDeathHead || playerDeathHead.playerAvatar != playerAvatar || playerDeathHead.transform.parent != playerAvatar.transform.parent)
             {
-                playerAvatar.playerDeathHead = playerDeathHead;
+                playerAvatar.SetPlayerDeathHead(playerDeathHead);
                 playerDeathHead.playerAvatar = playerAvatar;
                 playerDeathHead.transform.SetParent(playerAvatar.transform.parent);
                 Plugin.Log($"Reassigned PlayerDeathHead for player: {(!string.IsNullOrEmpty(playerName) ? playerName : (playerAvatar ? playerAvatar.name : ""))} ({photonView.Owner.ActorNumber}) - Assigned death head view id: " + deathHeadViewId);
@@ -159,7 +158,7 @@ namespace REPO_DeadTTS.Patches
                     PlayerAvatar crownedPlayer = SessionManager.instance.CrownedPlayerGet();
                     string crownedSteamId = crownedPlayer ? (string)steamIdField.GetValue(crownedPlayer) : "";
                     if (SemiFunc.IsMultiplayer() && (playerAvatar == crownedPlayer || (!string.IsNullOrEmpty(steamId) && steamId == crownedSteamId)))
-                        playerDeathHead.arenaCrown.SetActive(true);
+                        playerDeathHead.playerCrown.gameObject.SetActive(true);
                 }
                 catch { }
             }

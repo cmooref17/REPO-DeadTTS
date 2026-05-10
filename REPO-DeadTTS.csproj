@@ -84,6 +84,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ConfigSettings.cs" />
+    <Compile Include="ReflectionExtension.cs" />
     <Compile Include="Patches\DeadTTSPlayerData.cs" />
     <Content Include="Patches\PlayerAvatar_NEW.txt" />
     <Content Include="Patches\PlayerVoiceChat_NEW.txt" />
