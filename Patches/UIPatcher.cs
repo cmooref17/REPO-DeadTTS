@@ -39,7 +39,8 @@ namespace REPO_DeadTTS.Patches
             
             if (PlayerPatcher.IsPlayerDead(_player) && ConfigSettings.useSpatialAudioDeadTTS.Value && ConfigSettings.displayDeadTTSText.Value)
             {
-                if (!_player.playerDeathHead)
+                var deathHead = PlayerPatcher.GetPlayerDeathHead(_player);
+                if (!deathHead)
                 {
                     Plugin.LogErrorVerbose("Failed to re-create TTS UI component. PlayerDeathHead was not set by the game.");
                     return;
@@ -51,12 +52,12 @@ namespace REPO_DeadTTS.Patches
                 }
 
                 // If allowed to talk by base game
-                if ((bool)PlayerPatcher.spectatedField.GetValue(_player.playerDeathHead))
+                if ((bool)PlayerPatcher.spectatedField.GetValue(deathHead))
                 {
                     return;
                 }
 
-                if (!ConfigSettings.onlyEnableWhenDiscovered.Value || (bool)PlayerPatcher.serverSeenField.GetValue(_player.playerDeathHead) || PlayerPatcher.IsLocalPlayerDead() || !SemiFunc.RunIsLevel())
+                if (!ConfigSettings.onlyEnableWhenDiscovered.Value || (bool)PlayerPatcher.serverSeenField.GetValue(deathHead) || PlayerPatcher.IsLocalPlayerDead() || !SemiFunc.RunIsLevel())
                 {
                     try
                     {
@@ -90,7 +91,7 @@ namespace REPO_DeadTTS.Patches
 
                         playerAvatarField.SetValue(component, _player);
 
-                        Transform followTransform = _player.playerDeathHead.transform;
+                        Transform followTransform = deathHead.transform;
 
                         followTransformField.SetValue(component, followTransform);
                         worldPositionField.SetValue(component, followTransform.position);
@@ -117,7 +118,7 @@ namespace REPO_DeadTTS.Patches
                 }
                 else
                 {
-                    try { Plugin.LogWarningVerbose("Not creating TTS UI Element for dead player. ConfigEnableWhenDiscovered: " + ConfigSettings.onlyEnableWhenDiscovered.Value.ToString() + " | PlayerDiscovered: " + (ConfigSettings.onlyEnableWhenDiscovered.Value ? ((bool)PlayerPatcher.serverSeenField.GetValue(_player.playerDeathHead)).ToString() : "N/A") + " | IsLocalPlayerDead: " + PlayerPatcher.IsLocalPlayerDead().ToString() + " | RunIsLevel: " + SemiFunc.RunIsLevel().ToString()); }
+                    try { Plugin.LogWarningVerbose("Not creating TTS UI Element for dead player. ConfigEnableWhenDiscovered: " + ConfigSettings.onlyEnableWhenDiscovered.Value.ToString() + " | PlayerDiscovered: " + (ConfigSettings.onlyEnableWhenDiscovered.Value ? ((bool)PlayerPatcher.serverSeenField.GetValue(deathHead)).ToString() : "N/A") + " | IsLocalPlayerDead: " + PlayerPatcher.IsLocalPlayerDead().ToString() + " | RunIsLevel: " + SemiFunc.RunIsLevel().ToString()); }
                     catch(Exception e) { Plugin.LogErrorVerbose("Error logging state for OnTTSUI: " + e); }
                 }
             }

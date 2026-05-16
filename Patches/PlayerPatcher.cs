@@ -22,7 +22,10 @@ namespace REPO_DeadTTS.Patches
         internal static PlayerAvatar localPlayer;
         internal static FieldInfo voiceChatField = typeof(PlayerAvatar).GetField("voiceChat", BindingFlags.NonPublic | BindingFlags.Instance);
         internal static FieldInfo isDisabledField = typeof(PlayerAvatar).GetField("isDisabled", BindingFlags.NonPublic | BindingFlags.Instance);
+        internal static FieldInfo playerDeathHeadField = typeof(PlayerAvatar).GetField("playerDeathHead", BindingFlags.NonPublic | BindingFlags.Instance) ?? typeof(PlayerAvatar).GetField("playerDeathHead", BindingFlags.Public | BindingFlags.Instance);
         internal static FieldInfo serverSeenField = typeof(PlayerDeathHead).GetField("serverSeen", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        internal static PlayerDeathHead GetPlayerDeathHead(PlayerAvatar avatar) => avatar ? (PlayerDeathHead)playerDeathHeadField.GetValue(avatar) : null;
 
         internal static FieldInfo eyeMaterialField = typeof(PlayerDeathHead).GetField("eyeMaterial", BindingFlags.NonPublic | BindingFlags.Instance);
         internal static FieldInfo eyeMaterialAmountField = typeof(PlayerDeathHead).GetField("eyeMaterialAmount", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -96,17 +99,18 @@ namespace REPO_DeadTTS.Patches
                 return;
 
             var playerData = ___playerAvatar.GetComponent<DeadTTSPlayerData>();
+            var deathHead = GetPlayerDeathHead(___playerAvatar);
             // if this player is dead
             if (IsPlayerDead(___playerAvatar) && ___inLobbyMixerTTS)
             {
-                if (!ConfigSettings.onlyEnableWhenDiscovered.Value || (!___playerAvatar.playerDeathHead || (bool)serverSeenField.GetValue(___playerAvatar.playerDeathHead)) || IsLocalPlayerDead() || !SemiFunc.RunIsLevel())
+                if (!ConfigSettings.onlyEnableWhenDiscovered.Value || (!deathHead || (bool)serverSeenField.GetValue(deathHead)) || IsLocalPlayerDead() || !SemiFunc.RunIsLevel())
                 {
                     if (__instance.ttsAudioSource && __instance.mixerTTSSound)
                     {
                         if (__instance.ttsAudioSource.outputAudioMixerGroup != __instance.mixerTTSSound)
                         {
                             __instance.ttsAudioSource.outputAudioMixerGroup = __instance.mixerTTSSound;
-                            if (!___playerAvatar.playerDeathHead)
+                            if (!deathHead)
                             {
                                 Plugin.LogError("Game did not assign player a death head.");
                             }
@@ -150,23 +154,23 @@ namespace REPO_DeadTTS.Patches
                 }
 
                 // flash eyes while talking
-                if (___playerAvatar.playerDeathHead)
+                if (deathHead)
                 {
                     bool isSpeaking = (bool)isSpeakingField.GetValue(__instance.ttsVoice);
-                    Material eyeMaterial = (Material)eyeMaterialField.GetValue(___playerAvatar.playerDeathHead);
-                    int eyeMaterialAmount = (int)eyeMaterialAmountField.GetValue(___playerAvatar.playerDeathHead);
+                    Material eyeMaterial = (Material)eyeMaterialField.GetValue(deathHead);
+                    int eyeMaterialAmount = (int)eyeMaterialAmountField.GetValue(deathHead);
                     if (isSpeaking)
                     {
-                        float eyeFlashLerp = (float)eyeFlashLerpField.GetValue(___playerAvatar.playerDeathHead);
+                        float eyeFlashLerp = (float)eyeFlashLerpField.GetValue(deathHead);
                         float eyeFlashLerpTarget = Mathf.Clamp01(Mathf.Max(___clipLoudnessTTS, 0) / 0.2f);
                         eyeFlashLerp = Mathf.Lerp(eyeFlashLerp, eyeFlashLerpTarget, 20f * Time.deltaTime);
                         eyeMaterial.SetFloat(eyeMaterialAmount, Mathf.Pow(eyeFlashLerp, 0.5f));
-                        eyeFlashLerpField.SetValue(___playerAvatar.playerDeathHead, eyeFlashLerp);
+                        eyeFlashLerpField.SetValue(deathHead, eyeFlashLerp);
                     }
                     else
                     {
                         eyeMaterial.SetFloat(eyeMaterialAmount, 0);
-                        eyeFlashLerpField.SetValue(___playerAvatar.playerDeathHead, 0);
+                        eyeFlashLerpField.SetValue(deathHead, 0);
                     }
                 }
             }
@@ -195,10 +199,11 @@ namespace REPO_DeadTTS.Patches
                 }
 
                 // reset eyes
-                if (___playerAvatar.playerDeathHead)
+                var deathHead = GetPlayerDeathHead(___playerAvatar);
+                if (deathHead)
                 {
-                    Material eyeMaterial = (Material)eyeMaterialField.GetValue(___playerAvatar.playerDeathHead);
-                    int eyeMaterialAmount = (int)eyeMaterialAmountField.GetValue(___playerAvatar.playerDeathHead);
+                    Material eyeMaterial = (Material)eyeMaterialField.GetValue(deathHead);
+                    int eyeMaterialAmount = (int)eyeMaterialAmountField.GetValue(deathHead);
                     eyeMaterial.SetFloat(eyeMaterialAmount, 0);
                 }
             }
@@ -214,9 +219,10 @@ namespace REPO_DeadTTS.Patches
             if (GameDirector.instance.currentState != GameDirector.gameState.Main || !(SemiFunc.RunIsLevel() || SemiFunc.RunIsShop() || SemiFunc.RunIsArena()))
                 return;
 
-            if (___inLobbyMixerTTS && IsPlayerDead(___playerAvatar) && ___playerAvatar.playerDeathHead && __instance.ttsVoice)
+            var deathHead = GetPlayerDeathHead(___playerAvatar);
+            if (___inLobbyMixerTTS && IsPlayerDead(___playerAvatar) && deathHead && __instance.ttsVoice)
             {
-                __instance.transform.position = Vector3.Lerp(__instance.transform.position, ___playerAvatar.playerDeathHead.transform.position, 30f * Time.deltaTime);
+                __instance.transform.position = Vector3.Lerp(__instance.transform.position, deathHead.transform.position, 30f * Time.deltaTime);
             }
         }
 
@@ -230,7 +236,10 @@ namespace REPO_DeadTTS.Patches
 
         public static bool IsPlayerDead(PlayerAvatar playerAvatar)
         {
-            return playerAvatar && (bool)isDisabledField.GetValue(playerAvatar) && (!playerAvatar.playerDeathHead || playerAvatar.playerDeathHead.isActiveAndEnabled);
+            if (!playerAvatar || !(bool)isDisabledField.GetValue(playerAvatar))
+                return false;
+            var deathHead = GetPlayerDeathHead(playerAvatar);
+            return !deathHead || deathHead.isActiveAndEnabled;
         }
     }
 }

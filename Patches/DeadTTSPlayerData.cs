@@ -142,9 +142,9 @@ namespace REPO_DeadTTS.Patches
         {
             playerDeathHead = deathHead;
             int deathHeadViewId = playerDeathHead.GetComponent<PhotonView>().ViewID;
-            if (playerAvatar.playerDeathHead != playerDeathHead || playerDeathHead.playerAvatar != playerAvatar || playerDeathHead.transform.parent != playerAvatar.transform.parent)
+            if (PlayerPatcher.GetPlayerDeathHead(playerAvatar) != playerDeathHead || playerDeathHead.playerAvatar != playerAvatar || playerDeathHead.transform.parent != playerAvatar.transform.parent)
             {
-                playerAvatar.playerDeathHead = playerDeathHead;
+                PlayerPatcher.playerDeathHeadField.SetValue(playerAvatar, playerDeathHead);
                 playerDeathHead.playerAvatar = playerAvatar;
                 playerDeathHead.transform.SetParent(playerAvatar.transform.parent);
                 Plugin.Log($"Reassigned PlayerDeathHead for player: {(!string.IsNullOrEmpty(playerName) ? playerName : (playerAvatar ? playerAvatar.name : ""))} ({photonView.Owner.ActorNumber}) - Assigned death head view id: " + deathHeadViewId);
@@ -159,7 +159,7 @@ namespace REPO_DeadTTS.Patches
                     PlayerAvatar crownedPlayer = SessionManager.instance.CrownedPlayerGet();
                     string crownedSteamId = crownedPlayer ? (string)steamIdField.GetValue(crownedPlayer) : "";
                     if (SemiFunc.IsMultiplayer() && (playerAvatar == crownedPlayer || (!string.IsNullOrEmpty(steamId) && steamId == crownedSteamId)))
-                        playerDeathHead.arenaCrown.SetActive(true);
+                        playerDeathHead.playerCrown.gameObject.SetActive(true);
                 }
                 catch { }
             }
